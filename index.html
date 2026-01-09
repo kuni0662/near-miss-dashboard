@@ -3,148 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Near Miss Dashboard - Safety Incident Analysis</title>
-    
+    <title>Safety Incident Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-    <script src="https://unpkg.com/recharts@2.10.3/dist/Recharts.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <style>
-        body {
-            margin: 0;
-            background-color: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-    </style>
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
 </head>
-<body>
+<body class="bg-slate-50">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { 
-            BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
-            XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
-            ResponsiveContainer, AreaChart, Area 
-        } = Recharts;
+        const { useState, useMemo } = React;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } = Recharts;
 
-        const NearMissDashboard = () => {
-            const [data, setData] = useState([]);
-            const [loading, setLoading] = useState(false);
+        const Dashboard = () => {
+            const [rawData, setRawData] = useState([]);
             const [error, setError] = useState(null);
 
-            useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            }, [data]);
-
-            const handleFileUpload = (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-
-                setLoading(true);
-                setError(null);
-
+            const handleFile = (e) => {
+                const file = e.target.files[0];
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = (event) => {
                     try {
-                        const jsonData = JSON.parse(e.target.result);
-                        const dataArray = Array.isArray(jsonData) ? jsonData : [jsonData];
-                        setData(dataArray);
-                        setLoading(false);
+                        const json = JSON.parse(event.target.result);
+                        // Handle both array and single object
+                        const dataArray = Array.isArray(json) ? json : [json];
+                        setRawData(dataArray);
+                        setError(null);
                     } catch (err) {
-                        setError('Invalid JSON format. Please check the file.');
-                        setLoading(false);
+                        setError("Failed to parse JSON: " + err.message);
                     }
                 };
                 reader.readAsText(file);
             };
 
-            const loadSampleData = () => {
-                const primaryCategories = ['Energy Isolation', 'Fall Protection', 'Lifting', 'Electrical'];
-                const sample = Array.from({ length: 50 }, (_, i) => ({
-                    id: i,
-                    primary_category: primaryCategories[i % 4],
-                    severity_level: (i % 5) + 1,
-                    month: (i % 12) + 1,
-                    region: 'Asia',
-                    behavior_type: 'At-Risk'
-                }));
-                setData(sample);
-            };
-
-            const getStats = () => ({
-                total: data.length,
-                highSeverity: data.filter(d => d.severity_level >= 3).length,
-                atRisk: data.filter(d => d.behavior_type === 'At-Risk').length
-            });
-
-            const stats = getStats();
-
-            const getCategoryData = () => {
+            const categoryData = useMemo(() => {
                 const counts = {};
-                data.forEach(item => {
-                    counts[item.primary_category] = (counts[item.primary_category] || 0) + 1;
+                rawData.forEach(item => {
+                    const cat = item.primary_category || "Uncategorized";
+                    counts[cat] = (counts[cat] || 0) + 1;
+                });
+                return Object.entries(counts)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value).slice(0, 8);
+            }, [rawData]);
+
+            const severityData = useMemo(() => {
+                const counts = {};
+                rawData.forEach(item => {
+                    const sev = `Level ${item.severity_level || 0}`;
+                    counts[sev] = (counts[sev] || 0) + 1;
                 });
                 return Object.entries(counts).map(([name, value]) => ({ name, value }));
-            };
+            }, [rawData]);
+
+            const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
 
             return (
-                <div className="p-6 max-w-7xl mx-auto">
-                    <div className="bg-white rounded-xl shadow-lg p-6 mb-6 flex justify-between items-center">
+                <div className="p-8">
+                    <div className="mb-8 flex justify-between items-center bg-white p-6 rounded-xl shadow-sm">
                         <div>
-                            <h1 className="text-2xl font-bold">Safety Dashboard</h1>
-                            <p className="text-gray-500">Incident Analysis</p>
+                            <h1 className="text-3xl font-bold text-slate-800">Near Miss Dashboard</h1>
+                            <p className="text-slate-500">Loaded Records: {rawData.length}</p>
                         </div>
-                        <div className="flex gap-4">
-                            <label className="bg-blue-600 text-white px-4 py-2 rounded cursor-pointer">
-                                Upload JSON
-                                <input type="file" className="hidden" onChange={handleFileUpload} />
-                            </label>
-                            <button onClick={loadSampleData} className="bg-gray-200 px-4 py-2 rounded">Sample</button>
-                        </div>
+                        <input type="file" onChange={handleFile} className="block w-full max-w-xs text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="bg-blue-500 p-4 rounded-xl text-white">
-                            <p>Total</p>
-                            <p className="text-2xl font-bold">{stats.total}</p>
-                        </div>
-                        <div className="bg-orange-500 p-4 rounded-xl text-white">
-                            <p>High Severity</p>
-                            <p className="text-2xl font-bold">{stats.highSeverity}</p>
-                        </div>
-                        <div className="bg-red-500 p-4 rounded-xl text-white">
-                            <p>At-Risk</p>
-                            <p className="text-2xl font-bold">{stats.atRisk}</p>
-                        </div>
-                    </div>
+                    {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">{error}</div>}
 
-                    <div className="bg-white p-6 rounded-xl shadow-lg">
-                        <h2 className="text-xl font-bold mb-4">Incidents by Category</h2>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={getCategoryData()}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="value" fill="#3b82f6" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {rawData.length > 0 ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className="bg-white p-6 rounded-xl shadow-sm">
+                                <h3 className="text-lg font-bold mb-4">Top Incident Categories</h3>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={categoryData}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="name" fontSize={12} tick={{fill: '#64748b'}} />
+                                        <YAxis />
+                                        <Tooltip />
+                                        <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            <div className="bg-white p-6 rounded-xl shadow-sm">
+                                <h3 className="text-lg font-bold mb-4">Severity Distribution</h3>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <PieChart>
+                                        <Pie data={severityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                            {severityData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200">
+                            <p className="text-slate-400 text-xl">Please upload 'db.dashboard_incidents.json' to see visualizations</p>
+                        </div>
+                    )}
                 </div>
             );
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<NearMissDashboard />);
+        root.render(<Dashboard />);
     </script>
 </body>
 </html>
-
