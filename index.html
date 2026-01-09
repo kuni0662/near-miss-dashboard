@@ -1,0 +1,468 @@
+import React, { useState, useEffect } from 'react';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { Upload, AlertTriangle, TrendingUp, Calendar, MapPin, Shield, Activity } from 'lucide-react';
+
+const NearMissDashboard = () => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const jsonData = JSON.parse(e.target.result);
+        const dataArray = Array.isArray(jsonData) ? jsonData : [jsonData];
+        console.log('Loaded records:', dataArray.length);
+        setData(dataArray);
+        setLoading(false);
+      } catch (err) {
+        setError('Error parsing JSON file. Please ensure it is valid JSON format.');
+        setLoading(false);
+      }
+    };
+    reader.onerror = () => {
+      setError('Error reading file. Please try again.');
+      setLoading(false);
+    };
+    reader.readAsText(file);
+  };
+
+  const generateSampleData = () => {
+    const primaryCategories = ['Energy Isolation', 'Fall Protection', 'Lifting Operations', 'Electrical Safety', 'Hot Work', 'Confined Space', 'Working at Height', 'Material Handling'];
+    const behaviorTypes = ['At-Risk', 'Safe', 'Positive'];
+    const severityLevels = [1, 2, 3, 4, 5];
+    const regions = ['Asia (North Asia)', 'Americas', 'Europe', 'Middle East', 'Asia Pacific'];
+    const gbus = ['Energy', 'Infrastructure', 'Mining', 'Manufacturing'];
+    const locations = ['Area 42', 'Area 51', 'Site North', 'Site South', 'Zone A', 'Zone B'];
+    const unsafeTypes = ['Unsafe Condition', 'Unsafe Behavior', 'Both'];
+    
+    const sampleData = [];
+    for (let i = 0; i < 200; i++) {
+      const month = Math.floor(Math.random() * 12) + 1;
+      const year = 2024;
+      sampleData.push({
+        id: `13577${4577 + i}`,
+        incident_number: `13577${4577 + i}`,
+        primary_category: primaryCategories[Math.floor(Math.random() * primaryCategories.length)],
+        behavior_type: behaviorTypes[Math.floor(Math.random() * behaviorTypes.length)],
+        severity_level: severityLevels[Math.floor(Math.random() * severityLevels.length)],
+        region: regions[Math.floor(Math.random() * regions.length)],
+        gbu: gbus[Math.floor(Math.random() * gbus.length)],
+        location: locations[Math.floor(Math.random() * locations.length)],
+        unsafe_condition_or_behavior: unsafeTypes[Math.floor(Math.random() * unsafeTypes.length)],
+        month: month,
+        year: year,
+        week: Math.floor(Math.random() * 52) + 1,
+        is_lcv: Math.random() > 0.5,
+        company_type: Math.random() > 0.5 ? 'A' : 'B',
+        violation_severity_level: Math.floor(Math.random() * 3),
+        incident_date: new Date(2024, month - 1, Math.floor(Math.random() * 28) + 1).getTime()
+      });
+    }
+    return sampleData;
+  };
+
+  const loadSampleData = () => {
+    const sampleData = generateSampleData();
+    setData(sampleData);
+  };
+
+  useEffect(() => {
+    loadSampleData();
+  }, []);
+
+  const getStats = () => {
+    if (!data || data.length === 0) return { total: 0, highSeverity: 0, atRisk: 0, regions: 0 };
+    
+    const highSeverity = data.filter(d => d.severity_level >= 3).length;
+    const atRisk = data.filter(d => d.behavior_type === 'At-Risk').length;
+    const uniqueRegions = new Set(data.map(d => d.region).filter(Boolean));
+    
+    return {
+      total: data.length,
+      highSeverity,
+      atRisk,
+      regions: uniqueRegions.size
+    };
+  };
+
+  // Chart 1: Primary Category Distribution
+  const getPrimaryCategoryData = () => {
+    if (!data || data.length === 0) return [];
+    const categoryCount = {};
+    data.forEach(item => {
+      if (item.primary_category) {
+        categoryCount[item.primary_category] = (categoryCount[item.primary_category] || 0) + 1;
+      }
+    });
+    return Object.entries(categoryCount)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  };
+
+  // Chart 2: Severity Level Distribution
+  const getSeverityData = () => {
+    if (!data || data.length === 0) return [];
+    const severityCount = {};
+    data.forEach(item => {
+      if (item.severity_level !== undefined && item.severity_level !== null) {
+        const level = `Level ${item.severity_level}`;
+        severityCount[level] = (severityCount[level] || 0) + 1;
+      }
+    });
+    return Object.entries(severityCount)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => {
+        const aNum = parseInt(a.name.split(' ')[1]);
+        const bNum = parseInt(b.name.split(' ')[1]);
+        return aNum - bNum;
+      });
+  };
+
+  // Chart 3: Monthly Trend
+  const getMonthlyTrendData = () => {
+    if (!data || data.length === 0) return [];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlyCount = {};
+    
+    data.forEach(item => {
+      if (item.month) {
+        const monthName = monthNames[item.month - 1];
+        monthlyCount[monthName] = (monthlyCount[monthName] || 0) + 1;
+      }
+    });
+    
+    return monthNames.map(month => ({
+      month,
+      incidents: monthlyCount[month] || 0
+    }));
+  };
+
+  // Chart 4: Region Distribution
+  const getRegionData = () => {
+    if (!data || data.length === 0) return [];
+    const regionCount = {};
+    data.forEach(item => {
+      if (item.region) {
+        regionCount[item.region] = (regionCount[item.region] || 0) + 1;
+      }
+    });
+    return Object.entries(regionCount)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  };
+
+  // Chart 5: Behavior Type Distribution
+  const getBehaviorTypeData = () => {
+    if (!data || data.length === 0) return [];
+    const behaviorCount = {};
+    data.forEach(item => {
+      if (item.behavior_type) {
+        behaviorCount[item.behavior_type] = (behaviorCount[item.behavior_type] || 0) + 1;
+      }
+    });
+    return Object.entries(behaviorCount)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  };
+
+  // Chart 6: Unsafe Condition vs Behavior
+  const getUnsafeTypeData = () => {
+    if (!data || data.length === 0) return [];
+    const unsafeCount = {};
+    data.forEach(item => {
+      if (item.unsafe_condition_or_behavior) {
+        unsafeCount[item.unsafe_condition_or_behavior] = (unsafeCount[item.unsafe_condition_or_behavior] || 0) + 1;
+      }
+    });
+    return Object.entries(unsafeCount).map(([name, value]) => ({ name, value }));
+  };
+
+  // Chart 7: GBU Distribution
+  const getGBUData = () => {
+    if (!data || data.length === 0) return [];
+    const gbuCount = {};
+    data.forEach(item => {
+      if (item.gbu) {
+        gbuCount[item.gbu] = (gbuCount[item.gbu] || 0) + 1;
+      }
+    });
+    return Object.entries(gbuCount)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  };
+
+  const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#ef4444', '#06b6d4'];
+  const SEVERITY_COLORS = {
+    'Level 1': '#10b981',
+    'Level 2': '#22c55e', 
+    'Level 3': '#f59e0b',
+    'Level 4': '#f97316',
+    'Level 5': '#ef4444'
+  };
+
+  const stats = getStats();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-8 h-8 text-orange-500" />
+              <div>
+                <h1 className="text-3xl font-bold text-slate-800">Near Miss Dashboard</h1>
+                <p className="text-slate-600">Construction Safety Incident Analysis</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <label className="px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Upload JSON
+                <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
+              </label>
+              <button onClick={loadSampleData} className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition">
+                Load Sample Data
+              </button>
+            </div>
+          </div>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              {error}
+            </div>
+          )}
+          {loading && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700">
+              Loading data...
+            </div>
+          )}
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-md p-5 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm">Total Incidents</p>
+                <p className="text-3xl font-bold">{stats.total}</p>
+              </div>
+              <TrendingUp className="w-10 h-10 text-blue-200" />
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-md p-5 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-100 text-sm">High Severity (≥3)</p>
+                <p className="text-3xl font-bold">{stats.highSeverity}</p>
+              </div>
+              <AlertTriangle className="w-10 h-10 text-orange-200" />
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-md p-5 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-100 text-sm">At-Risk Behavior</p>
+                <p className="text-3xl font-bold">{stats.atRisk}</p>
+              </div>
+              <Shield className="w-10 h-10 text-red-200" />
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-md p-5 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm">Regions Covered</p>
+                <p className="text-3xl font-bold">{stats.regions}</p>
+              </div>
+              <MapPin className="w-10 h-10 text-purple-200" />
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Chart 1: Primary Category Distribution */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-slate-800 mb-4">Top Incident Categories</h2>
+            {getPrimaryCategoryData().length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={getPrimaryCategoryData()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={120} fontSize={12} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-slate-400">
+                No data available
+              </div>
+            )}
+          </div>
+
+          {/* Chart 2: Severity Level Distribution */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-slate-800 mb-4">Severity Level Distribution</h2>
+            {getSeverityData().length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie 
+                    data={getSeverityData()} 
+                    cx="50%" 
+                    cy="50%" 
+                    labelLine={false} 
+                    label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`} 
+                    outerRadius={100} 
+                    fill="#8884d8" 
+                    dataKey="value"
+                  >
+                    {getSeverityData().map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[entry.name] || COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-slate-400">
+                No data available
+              </div>
+            )}
+          </div>
+
+          {/* Chart 3: Monthly Trend */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-slate-800 mb-4">Monthly Incident Trend</h2>
+            {getMonthlyTrendData().length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={getMonthlyTrendData()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Area type="monotone" dataKey="incidents" stroke="#3b82f6" fill="#93c5fd" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-slate-400">
+                No data available
+              </div>
+            )}
+          </div>
+
+          {/* Chart 4: Region Distribution */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-slate-800 mb-4">Incidents by Region</h2>
+            {getRegionData().length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={getRegionData()} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={120} fontSize={12} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#8b5cf6" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-slate-400">
+                No data available
+              </div>
+            )}
+          </div>
+
+          {/* Chart 5: Behavior Type Distribution */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-slate-800 mb-4">Behavior Type Analysis</h2>
+            {getBehaviorTypeData().length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie 
+                    data={getBehaviorTypeData()} 
+                    cx="50%" 
+                    cy="50%" 
+                    labelLine={true} 
+                    label={({name, value}) => `${name}: ${value}`} 
+                    outerRadius={100} 
+                    fill="#8884d8" 
+                    dataKey="value"
+                  >
+                    {getBehaviorTypeData().map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-slate-400">
+                No data available
+              </div>
+            )}
+          </div>
+
+          {/* Chart 6: Unsafe Condition vs Behavior */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-slate-800 mb-4">Unsafe Condition vs Behavior</h2>
+            {getUnsafeTypeData().length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={getUnsafeTypeData()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#ec4899" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-slate-400">
+                No data available
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Chart 7: GBU Distribution (Full Width) */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-slate-800 mb-4">Incidents by Business Unit (GBU)</h2>
+          {getGBUData().length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={getGBUData()}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="value" fill="#10b981" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-slate-400">
+              No data available
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 bg-white rounded-xl shadow-md p-4">
+          <div className="text-center text-slate-600 text-sm">
+            <p className="font-semibold">Dashboard Statistics</p>
+            <p>Total Records Loaded: {data.length.toLocaleString()} | Last Updated: {new Date().toLocaleString()}</p>
+            <p className="text-xs text-slate-500 mt-1">Upload your JSON file to visualize your 7,280+ near miss incidents</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default NearMissDashboard;
