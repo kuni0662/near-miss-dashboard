@@ -3,115 +3,457 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Safety Incident Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Near Miss Dashboard</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
-<body class="bg-slate-50">
+<body>
     <div id="root"></div>
-
     <script type="text/babel">
-        const { useState, useMemo } = React;
-        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } = Recharts;
+        const { useState, useEffect } = React;
+        const { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } = Recharts;
 
-        const Dashboard = () => {
-            const [rawData, setRawData] = useState([]);
+        const Upload = ({ className, size = 24 }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+        );
+
+        const AlertTriangle = ({ className, size = 24 }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+        );
+
+        const TrendingUp = ({ className, size = 24 }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                <polyline points="16 7 22 7 22 13"></polyline>
+            </svg>
+        );
+
+        const Calendar = ({ className, size = 24 }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+        );
+
+        const MapPin = ({ className, size = 24 }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+        );
+
+        const Shield = ({ className, size = 24 }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+        );
+
+        const NearMissDashboard = () => {
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
 
-            const handleFile = (e) => {
-                const file = e.target.files[0];
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                setLoading(true);
+                setError(null);
+
                 const reader = new FileReader();
-                reader.onload = (event) => {
+                reader.onload = (e) => {
                     try {
-                        const json = JSON.parse(event.target.result);
-                        // Handle both array and single object
-                        const dataArray = Array.isArray(json) ? json : [json];
-                        setRawData(dataArray);
-                        setError(null);
+                        const jsonData = JSON.parse(e.target.result);
+                        const dataArray = Array.isArray(jsonData) ? jsonData : [jsonData];
+                        console.log('Loaded records:', dataArray.length);
+                        setData(dataArray);
+                        setLoading(false);
                     } catch (err) {
-                        setError("Failed to parse JSON: " + err.message);
+                        setError('Error parsing JSON file. Please ensure it is valid JSON format.');
+                        setLoading(false);
                     }
+                };
+                reader.onerror = () => {
+                    setError('Error reading file. Please try again.');
+                    setLoading(false);
                 };
                 reader.readAsText(file);
             };
 
-            const categoryData = useMemo(() => {
-                const counts = {};
-                rawData.forEach(item => {
-                    const cat = item.primary_category || "Uncategorized";
-                    counts[cat] = (counts[cat] || 0) + 1;
+            const generateSampleData = () => {
+                const primaryCategories = ['Energy Isolation', 'Fall Protection', 'Lifting Operations', 'Electrical Safety', 'Hot Work', 'Confined Space', 'Working at Height', 'Material Handling'];
+                const behaviorTypes = ['At-Risk', 'Safe', 'Positive'];
+                const severityLevels = [1, 2, 3, 4, 5];
+                const regions = ['Asia (North Asia)', 'Americas', 'Europe', 'Middle East', 'Asia Pacific'];
+                const gbus = ['Energy', 'Infrastructure', 'Mining', 'Manufacturing'];
+                const locations = ['Area 42', 'Area 51', 'Site North', 'Site South', 'Zone A', 'Zone B'];
+                const unsafeTypes = ['Unsafe Condition', 'Unsafe Behavior', 'Both'];
+                
+                const sampleData = [];
+                for (let i = 0; i < 200; i++) {
+                    const month = Math.floor(Math.random() * 12) + 1;
+                    const year = 2024;
+                    sampleData.push({
+                        id: `13577${4577 + i}`,
+                        incident_number: `13577${4577 + i}`,
+                        primary_category: primaryCategories[Math.floor(Math.random() * primaryCategories.length)],
+                        behavior_type: behaviorTypes[Math.floor(Math.random() * behaviorTypes.length)],
+                        severity_level: severityLevels[Math.floor(Math.random() * severityLevels.length)],
+                        region: regions[Math.floor(Math.random() * regions.length)],
+                        gbu: gbus[Math.floor(Math.random() * gbus.length)],
+                        location: locations[Math.floor(Math.random() * locations.length)],
+                        unsafe_condition_or_behavior: unsafeTypes[Math.floor(Math.random() * unsafeTypes.length)],
+                        month: month,
+                        year: year,
+                        week: Math.floor(Math.random() * 52) + 1,
+                        is_lcv: Math.random() > 0.5,
+                        company_type: Math.random() > 0.5 ? 'A' : 'B',
+                        violation_severity_level: Math.floor(Math.random() * 3),
+                        incident_date: new Date(2024, month - 1, Math.floor(Math.random() * 28) + 1).getTime()
+                    });
+                }
+                return sampleData;
+            };
+
+            const loadSampleData = () => {
+                const sampleData = generateSampleData();
+                setData(sampleData);
+            };
+
+            useEffect(() => {
+                loadSampleData();
+            }, []);
+
+            const getStats = () => {
+                if (!data || data.length === 0) return { total: 0, highSeverity: 0, atRisk: 0, regions: 0 };
+                
+                const highSeverity = data.filter(d => d.severity_level >= 3).length;
+                const atRisk = data.filter(d => d.behavior_type === 'At-Risk').length;
+                const uniqueRegions = new Set(data.map(d => d.region).filter(Boolean));
+                
+                return {
+                    total: data.length,
+                    highSeverity,
+                    atRisk,
+                    regions: uniqueRegions.size
+                };
+            };
+
+            const getPrimaryCategoryData = () => {
+                if (!data || data.length === 0) return [];
+                const categoryCount = {};
+                data.forEach(item => {
+                    if (item.primary_category) {
+                        categoryCount[item.primary_category] = (categoryCount[item.primary_category] || 0) + 1;
+                    }
                 });
-                return Object.entries(counts)
+                return Object.entries(categoryCount)
                     .map(([name, value]) => ({ name, value }))
-                    .sort((a, b) => b.value - a.value).slice(0, 8);
-            }, [rawData]);
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 10);
+            };
 
-            const severityData = useMemo(() => {
-                const counts = {};
-                rawData.forEach(item => {
-                    const sev = `Level ${item.severity_level || 0}`;
-                    counts[sev] = (counts[sev] || 0) + 1;
+            const getSeverityData = () => {
+                if (!data || data.length === 0) return [];
+                const severityCount = {};
+                data.forEach(item => {
+                    if (item.severity_level !== undefined && item.severity_level !== null) {
+                        const level = `Level ${item.severity_level}`;
+                        severityCount[level] = (severityCount[level] || 0) + 1;
+                    }
                 });
-                return Object.entries(counts).map(([name, value]) => ({ name, value }));
-            }, [rawData]);
+                return Object.entries(severityCount)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => {
+                        const aNum = parseInt(a.name.split(' ')[1]);
+                        const bNum = parseInt(b.name.split(' ')[1]);
+                        return aNum - bNum;
+                    });
+            };
 
-            const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
+            const getMonthlyTrendData = () => {
+                if (!data || data.length === 0) return [];
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const monthlyCount = {};
+                
+                data.forEach(item => {
+                    if (item.month) {
+                        const monthName = monthNames[item.month - 1];
+                        monthlyCount[monthName] = (monthlyCount[monthName] || 0) + 1;
+                    }
+                });
+                
+                return monthNames.map(month => ({
+                    month,
+                    incidents: monthlyCount[month] || 0
+                }));
+            };
+
+            const getRegionData = () => {
+                if (!data || data.length === 0) return [];
+                const regionCount = {};
+                data.forEach(item => {
+                    if (item.region) {
+                        regionCount[item.region] = (regionCount[item.region] || 0) + 1;
+                    }
+                });
+                return Object.entries(regionCount)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value);
+            };
+
+            const getBehaviorTypeData = () => {
+                if (!data || data.length === 0) return [];
+                const behaviorCount = {};
+                data.forEach(item => {
+                    if (item.behavior_type) {
+                        behaviorCount[item.behavior_type] = (behaviorCount[item.behavior_type] || 0) + 1;
+                    }
+                });
+                return Object.entries(behaviorCount)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value);
+            };
+
+            const getUnsafeTypeData = () => {
+                if (!data || data.length === 0) return [];
+                const unsafeCount = {};
+                data.forEach(item => {
+                    if (item.unsafe_condition_or_behavior) {
+                        unsafeCount[item.unsafe_condition_or_behavior] = (unsafeCount[item.unsafe_condition_or_behavior] || 0) + 1;
+                    }
+                });
+                return Object.entries(unsafeCount).map(([name, value]) => ({ name, value }));
+            };
+
+            const getGBUData = () => {
+                if (!data || data.length === 0) return [];
+                const gbuCount = {};
+                data.forEach(item => {
+                    if (item.gbu) {
+                        gbuCount[item.gbu] = (gbuCount[item.gbu] || 0) + 1;
+                    }
+                });
+                return Object.entries(gbuCount)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value);
+            };
+
+            const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#ef4444', '#06b6d4'];
+            const SEVERITY_COLORS = {
+                'Level 1': '#10b981',
+                'Level 2': '#22c55e', 
+                'Level 3': '#f59e0b',
+                'Level 4': '#f97316',
+                'Level 5': '#ef4444'
+            };
+
+            const stats = getStats();
 
             return (
-                <div className="p-8">
-                    <div className="mb-8 flex justify-between items-center bg-white p-6 rounded-xl shadow-sm">
-                        <div>
-                            <h1 className="text-3xl font-bold text-slate-800">Near Miss Dashboard</h1>
-                            <p className="text-slate-500">Loaded Records: {rawData.length}</p>
+                <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-3">
+                                    <AlertTriangle className="w-8 h-8 text-orange-500" />
+                                    <div>
+                                        <h1 className="text-3xl font-bold text-slate-800">Near Miss Dashboard</h1>
+                                        <p className="text-slate-600">Construction Safety Incident Analysis</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <label className="px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition flex items-center gap-2">
+                                        <Upload className="w-4 h-4" />
+                                        Upload JSON
+                                        <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
+                                    </label>
+                                    <button onClick={loadSampleData} className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition">
+                                        Load Sample Data
+                                    </button>
+                                </div>
+                            </div>
+                            {error && <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>}
+                            {loading && <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700">Loading data...</div>}
                         </div>
-                        <input type="file" onChange={handleFile} className="block w-full max-w-xs text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-                    </div>
 
-                    {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">{error}</div>}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-md p-5 text-white">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-blue-100 text-sm">Total Incidents</p>
+                                        <p className="text-3xl font-bold">{stats.total}</p>
+                                    </div>
+                                    <TrendingUp className="w-10 h-10 text-blue-200" />
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-md p-5 text-white">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-orange-100 text-sm">High Severity (≥3)</p>
+                                        <p className="text-3xl font-bold">{stats.highSeverity}</p>
+                                    </div>
+                                    <AlertTriangle className="w-10 h-10 text-orange-200" />
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-md p-5 text-white">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-red-100 text-sm">At-Risk Behavior</p>
+                                        <p className="text-3xl font-bold">{stats.atRisk}</p>
+                                    </div>
+                                    <Shield className="w-10 h-10 text-red-200" />
+                                </div>
+                            </div>
+                            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-md p-5 text-white">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-purple-100 text-sm">Regions Covered</p>
+                                        <p className="text-3xl font-bold">{stats.regions}</p>
+                                    </div>
+                                    <MapPin className="w-10 h-10 text-purple-200" />
+                                </div>
+                            </div>
+                        </div>
 
-                    {rawData.length > 0 ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            <div className="bg-white p-6 rounded-xl shadow-sm">
-                                <h3 className="text-lg font-bold mb-4">Top Incident Categories</h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-semibold text-slate-800 mb-4">Top Incident Categories</h2>
+                                {getPrimaryCategoryData().length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <BarChart data={getPrimaryCategoryData()}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="name" angle={-45} textAnchor="end" height={120} fontSize={12} />
+                                            <YAxis />
+                                            <Tooltip />
+                                            <Bar dataKey="value" fill="#3b82f6" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : <div className="h-[300px] flex items-center justify-center text-slate-400">No data available</div>}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-semibold text-slate-800 mb-4">Severity Level Distribution</h2>
+                                {getSeverityData().length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <PieChart>
+                                            <Pie data={getSeverityData()} cx="50%" cy="50%" labelLine={false} label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={100} fill="#8884d8" dataKey="value">
+                                                {getSeverityData().map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[entry.name] || COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                ) : <div className="h-[300px] flex items-center justify-center text-slate-400">No data available</div>}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-semibold text-slate-800 mb-4">Monthly Incident Trend</h2>
+                                {getMonthlyTrendData().length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <AreaChart data={getMonthlyTrendData()}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="month" />
+                                            <YAxis />
+                                            <Tooltip />
+                                            <Legend />
+                                            <Area type="monotone" dataKey="incidents" stroke="#3b82f6" fill="#93c5fd" strokeWidth={2} />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                ) : <div className="h-[300px] flex items-center justify-center text-slate-400">No data available</div>}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-semibold text-slate-800 mb-4">Incidents by Region</h2>
+                                {getRegionData().length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <BarChart data={getRegionData()} layout="vertical">
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis type="number" />
+                                            <YAxis dataKey="name" type="category" width={120} fontSize={12} />
+                                            <Tooltip />
+                                            <Bar dataKey="value" fill="#8b5cf6" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : <div className="h-[300px] flex items-center justify-center text-slate-400">No data available</div>}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-semibold text-slate-800 mb-4">Behavior Type Analysis</h2>
+                                {getBehaviorTypeData().length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <PieChart>
+                                            <Pie data={getBehaviorTypeData()} cx="50%" cy="50%" labelLine={true} label={({name, value}) => `${name}: ${value}`} outerRadius={100} fill="#8884d8" dataKey="value">
+                                                {getBehaviorTypeData().map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                ) : <div className="h-[300px] flex items-center justify-center text-slate-400">No data available</div>}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-semibold text-slate-800 mb-4">Unsafe Condition vs Behavior</h2>
+                                {getUnsafeTypeData().length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <BarChart data={getUnsafeTypeData()}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="name" />
+                                            <YAxis />
+                                            <Tooltip />
+                                            <Bar dataKey="value" fill="#ec4899" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : <div className="h-[300px] flex items-center justify-center text-slate-400">No data available</div>}
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <h2 className="text-xl font-semibold text-slate-800 mb-4">Incidents by Business Unit (GBU)</h2>
+                            {getGBUData().length > 0 ? (
                                 <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={categoryData}>
+                                    <BarChart data={getGBUData()}>
                                         <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="name" fontSize={12} tick={{fill: '#64748b'}} />
+                                        <XAxis dataKey="name" />
                                         <YAxis />
                                         <Tooltip />
-                                        <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                        <Legend />
+                                        <Bar dataKey="value" fill="#10b981" />
                                     </BarChart>
                                 </ResponsiveContainer>
-                            </div>
+                            ) : <div className="h-[300px] flex items-center justify-center text-slate-400">No data available</div>}
+                        </div>
 
-                            <div className="bg-white p-6 rounded-xl shadow-sm">
-                                <h3 className="text-lg font-bold mb-4">Severity Distribution</h3>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <PieChart>
-                                        <Pie data={severityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                                            {severityData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
+                        <div className="mt-6 bg-white rounded-xl shadow-md p-4">
+                            <div className="text-center text-slate-600 text-sm">
+                                <p className="font-semibold">Dashboard Statistics</p>
+                                <p>Total Records Loaded: {data.length.toLocaleString()} | Last Updated: {new Date().toLocaleString()}</p>
+                                <p className="text-xs text-slate-500 mt-1">Upload your JSON file to visualize your 7,280+ near miss incidents</p>
                             </div>
                         </div>
-                    ) : (
-                        <div className="text-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200">
-                            <p className="text-slate-400 text-xl">Please upload 'db.dashboard_incidents.json' to see visualizations</p>
-                        </div>
-                    )}
+                    </div>
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<Dashboard />);
+        ReactDOM.render(<NearMissDashboard />, document.getElementById('root'));
     </script>
 </body>
 </html>
